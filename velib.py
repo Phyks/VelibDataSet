@@ -108,7 +108,7 @@ def update_stations():
                 c.execute("UPDATE " +
                           "stations " +
                           "SET name=?, address=?, latitude=?, longitude=?, " +
-                          "banking=?, bonus=?, bike_stands=? WHERE id=?)",
+                          "banking=?, bonus=?, bike_stands=? WHERE id=?",
                           (station["name"],
                            station["address"],
                            station["position"]["lat"],
