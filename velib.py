@@ -37,7 +37,7 @@ def db_init():
               "timestamp INTEGER, " +
               "event TEXT, " +
               "FOREIGN KEY(station_id) REFERENCES stations(id) ON DELETE CASCADE)")
-    c.execute("CREATE INDEX IF NOT EXISTS stationsevents_station_id ON stationsevents (station_id)"); 
+    c.execute("CREATE INDEX IF NOT EXISTS stationsevents_station_id ON stationsevents (station_id)");
     conn.commit()
     return conn
 
@@ -137,6 +137,8 @@ def update_stations():
                        station["banking"],
                        station["bonus"],
                        station["bike_stands"]))
+        except TypeError:
+            pass
 
         c.execute("INSERT INTO " +
                   "stationsstats(station_id, available_bikes, free_stands, status, updated) " +
