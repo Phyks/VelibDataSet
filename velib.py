@@ -138,7 +138,8 @@ def update_stations():
                        station["bonus"],
                        station["bike_stands"]))
         except TypeError:
-            pass
+            conn.rollback()
+            return
 
         c.execute("INSERT INTO " +
                   "stationsstats(station_id, available_bikes, free_stands, status, updated) " +
