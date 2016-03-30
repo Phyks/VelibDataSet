@@ -4,6 +4,7 @@ from config import *
 import json
 import requests
 import sqlite3
+import sys
 import time
 
 
@@ -52,7 +53,10 @@ def retrieve_stations():
     r = requests.get(api_endpoint,
                      params={"apiKey": api_key, "contract": contract})
     # Handle the JSON response
-    stations_list_json = json.loads(r.text)
+    try:
+        stations_list_json = json.loads(r.text)
+    except ValueError:
+        sys.exit("Got invalid JSON payload:\n" + r.text)
     stations_list = []
     for station in stations_list_json:
         stations_list.append(station)
