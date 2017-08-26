@@ -1,4 +1,4 @@
 __pycache__
 config.py
-data.db
+*.db
 *.pyc
