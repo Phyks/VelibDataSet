@@ -38,7 +38,10 @@ def db_init():
               "timestamp INTEGER, " +
               "event TEXT, " +
               "FOREIGN KEY(station_id) REFERENCES stations(id) ON DELETE CASCADE)")
+    c.execute("CREATE INDEX IF NOT EXISTS stationstats_station_id ON stationsstats (station_id)");
+    c.execute("CREATE INDEX IF NOT EXISTS stationsstats_updated ON stationsstats (updated)");
     c.execute("CREATE INDEX IF NOT EXISTS stationsevents_station_id ON stationsevents (station_id)");
+    c.execute("CREATE INDEX IF NOT EXISTS stationsevents_timestamp ON stationsevents (timestamp)");
     conn.commit()
     return conn
 
