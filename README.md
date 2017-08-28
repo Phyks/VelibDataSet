@@ -1,7 +1,9 @@
 VelibDataSet
 ============
 
-This code can be used to dump periodically all the available data from the Velib API. These data are under an OpenData license. (Velib is a bike sharing system in Paris).
+This code can be used to dump periodically all the available data from the
+Velib API, the bike sharing system in Paris. The data are under an OpenData
+license.
 
 ## Usage
 
@@ -14,3 +16,9 @@ This code can be used to dump periodically all the available data from the Velib
 
 * Velib API: https://developer.jcdecaux.com/#/home
 * Velib website: http://velib.paris/
+
+## License
+
+Data is under [an Open Data license](https://developer.jcdecaux.com/#/opendata/license).
+
+Code is released under MIT license.

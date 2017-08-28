@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 from config import *
 
+import datetime
 import json
 import requests
+import os
 import sqlite3
 import sys
 import time
@@ -14,7 +16,16 @@ def db_init():
 
     Returns a new connection.
     """
-    conn = sqlite3.connect("data.db")
+    now = datetime.datetime.now()
+    db_name = "week_%s.db" % now.strftime("%V")
+    db_folder = os.path.join(
+        'data',
+        now.strftime('%Y')
+    )
+    if not os.path.isdir(db_folder):
+        os.makedirs(db_folder)
+
+    conn = sqlite3.connect(os.path.join(db_folder, db_name))
     c = conn.cursor()
     # Init tables
     c.execute("CREATE TABLE IF NOT EXISTS stations(" +
