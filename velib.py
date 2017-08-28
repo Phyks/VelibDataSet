@@ -16,7 +16,7 @@ def db_init():
     """
     conn = sqlite3.connect("data.db")
     c = conn.cursor()
-    # TODO: Init tables
+    # Init tables
     c.execute("CREATE TABLE IF NOT EXISTS stations(" +
               "id INTEGER PRIMARY KEY, " +
               "name TEXT, " +
