@@ -1,9 +1,23 @@
 #!/usr/bin/env python3
 # coding: utf-8
 """
-Visualisation of Velib data
+Visualisation of Velib data.
 
-Note: This does not take into account the stations events.
+The generated maps shows the number of available bikes for each stations,
+plotted on the map of Paris. We use a Voronoi diagram to draw tiles on top of
+Paris map (think of each tiles as the "area of influence" of a given Velib
+station). Green represents a large number of available bikes, red represents a
+low number of available bikes.
+
+This script requires a couple of arguments from the command-line:
+    * The path to the SQLite DB file to use.
+    * The path to the folder in which generated images should be put.
+    * [Optional] A timestamp to start from, to resume operation for instance.
+
+Note: This code does not take into account the stations events (change of
+station size, new stations, stations deletion). Hence, there might be small
+mistakes in the visualization, such as stations without data. This should be
+handled in an improved version.
 """
 from __future__ import division
 
@@ -28,23 +42,27 @@ def get_hue(percentage):
     Convert a percentage to a hue,
     to map a percentage to a color
     in the green - yellow - orange - red scale.
+
+    Red means 0%, green means 100%.
     """
-    value = percentage / 100.0
+    value = (100 - percentage) / 100.0
     hue = (1 - value) * 120
     return hue / 360.0
 
 
+# Handle arguments from command-line
 if len(sys.argv) < 3:
     sys.exit('Usage: %s db_file out_dir' % sys.argv[0])
-
 db_file = sys.argv[1]
 out_dir = sys.argv[2]
 
+# Handle optional first timestamp argument
 first_timestamp = None
 if len(sys.argv) > 3:
     first_timestamp = int(sys.argv[3])
 
-progressbar.streams.wrap_stderr()
+# Init progressbar and logging
+progressbar.streams.wrap_stderr()  # Required before logging.basicConfig
 logging.basicConfig(level=logging.INFO)
 
 # Ensure out folder exists
@@ -186,6 +204,9 @@ for t, in bar(time_data):
             region = vor_regions[station_data[0]]
             region["mpl_surface"].set_color(matplotlib.colors.hsv_to_rgb([get_hue(percentage), 1.0, 1.0]))
         except KeyError:
+            # This can happen for a station at the boundaries (we volontarily
+            # ignore them) or for station which disappeared at some point in
+            # the dataset (as we don't handle stations events by now).
             logging.debug('Unknown Voronoi region for station %d.', station_data[0])
 
     # Output frame if necessary
