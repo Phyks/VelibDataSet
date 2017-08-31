@@ -12,11 +12,12 @@ import logging
 import os
 import pickle
 import sqlite3
+import sys
 
 import matplotlib
 matplotlib.use('AGG')  # Use non-interactive backend
 import matplotlib.pyplot as plt
-import progressbar
+import progressbar  # progressbar2 pip module
 import smopy
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
@@ -33,18 +34,28 @@ def get_hue(percentage):
     return hue / 360.0
 
 
+if len(sys.argv) < 3:
+    sys.exit('Usage: %s db_file out_dir' % sys.argv[0])
+
+db_file = sys.argv[1]
+out_dir = sys.argv[2]
+
+first_timestamp = None
+if len(sys.argv) > 3:
+    first_timestamp = int(sys.argv[3])
+
 progressbar.streams.wrap_stderr()
 logging.basicConfig(level=logging.INFO)
 
 # Ensure out folder exists
-if not os.path.isdir('out'):
-    logging.info('Creating out folder…')
-    os.mkdir('out')
+if not os.path.isdir(out_dir):
+    logging.info('Creating output folder %s…', out_dir)
+    os.makedirs(out_dir)
 
 
 # Load all stations from the database
 logging.info('Loading all stations from the database…')
-conn = sqlite3.connect("data.db")
+conn = sqlite3.connect(db_file)
 c = conn.cursor()
 stations = c.execute(
     "SELECT id, latitude, longitude, bike_stands, name FROM stations"
@@ -100,9 +111,10 @@ for point_index, region_index in enumerate(vor.point_region):
         "mpl_surface": None  # Will store the drawn matplotlib surface (to update it easily)
     }
 # Dumping Voronoi diagram
-with open('out/voronoi.dat', 'wb') as fh:
+voronoi_file = os.path.join(out_dir, 'voronoi.dat')
+with open(voronoi_file, 'wb') as fh:
     pickle.dump(vor_regions, fh)
-logging.info('Dumped Voronoi diagram to out/voronoi.dat')
+logging.info('Dumped Voronoi diagram to voronoi.dat')
 
 
 # Plotting
@@ -135,9 +147,15 @@ for station_id, region in vor_regions.items():
 
 # Get time steps
 logging.info('Loading time steps from the database.')
-time_data = c.execute(
-    "SELECT DISTINCT updated FROM stationsstats WHERE updated ORDER BY updated ASC"
-)
+if first_timestamp:
+    time_data = c.execute(
+        "SELECT DISTINCT updated FROM stationsstats WHERE updated > ? ORDER BY updated ASC",
+        (first_timestamp,)
+    )
+else:
+    time_data = c.execute(
+        "SELECT DISTINCT updated FROM stationsstats WHERE updated ORDER BY updated ASC"
+    )
 last_t = None
 timesteps = 5 * 60 * 1000  # 5 mins timesteps between each frames
 
@@ -168,15 +186,15 @@ for t, in bar(time_data):
             region = vor_regions[station_data[0]]
             region["mpl_surface"].set_color(matplotlib.colors.hsv_to_rgb([get_hue(percentage), 1.0, 1.0]))
         except KeyError:
-            logging.warn('Unknown Voronoi region for station %d.', station_data[0])
+            logging.debug('Unknown Voronoi region for station %d.', station_data[0])
 
     # Output frame if necessary
     if t >= last_t + timesteps:
         ax.set_title(datetime.datetime.fromtimestamp(t // 1000).strftime('%d/%m/%Y %H:%M'))
         fig.tight_layout()
-        fig.savefig('out/%d.png' % t)
+        fig.savefig(os.path.join(out_dir, '%d.png' % t))
         last_t = t
 
 # Output last frame
 fig.tight_layout()
-fig.savefig('out/%d.png' % t)
+fig.savefig(os.path.join(out_dir, '%d.png' % t))
