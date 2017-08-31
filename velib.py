@@ -141,7 +141,7 @@ def update_stations():
                           "stationsevents(station_id, timestamp, event) " +
                           "VALUES(?, ?, ?)",
                           (station["number"],
-                           time.time(),
+                           int(time.time()),
                            json.dumps(event)))
         except KeyError:
             c.execute("INSERT INTO " +
