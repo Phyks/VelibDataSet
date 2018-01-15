@@ -1,6 +1,4 @@
 #!/usr/bin/env python3
-from config import *
-
 import datetime
 import json
 import os

@@ -2,18 +2,26 @@ VelibDataSet
 ============
 
 This code can be used to dump periodically all the available data from the
-Velib API, the bike sharing system in Paris. The data are under an OpenData
-license.
+Velib API, the bike sharing system in Paris.
+
+It is basically a wrapper around [pybikes](https://github.com/eskerda/pybikes)
+to dump values periodically in a SQLite database.
+
 
 ## Usage
 
 * Clone this repo.
-* Create an account to access the velib API: https://developer.jcdecaux.com/#/home.
-* Copy `config.py.example` to `config.py` and set your API key there.
-* Run `velib.py`.
+* Install [pybikes](https://github.com/eskerda/pybikes).
+* Run `python2 velib.py`.
+
+_Note:_ For now, `pybikes` is only Python2 compatible.
 
 
 ## Dumped data
+
+**Important:** For the latest information about the dump available at
+https://pub.phyks.me/datasets/velib/, please refer to
+https://pub.phyks.me/datasets/velib/README.txt.
 
 This script is used to dump the returned data from the Velib API every few
 minutes. Dumps are available at https://pub.phyks.me/datasets/velib/.
@@ -57,11 +65,8 @@ cat *.png | ffmpeg -f image2pipe -framerate 10 -i - output.mp4
 
 ## Links
 
-* Velib API: https://developer.jcdecaux.com/#/home
-* Velib website: http://velib.paris/
+* Velib website: http://velib-metropole.fr/
 
 ## License
-
-Data is under [an Open Data license](https://developer.jcdecaux.com/#/opendata/license).
 
 Code is released under MIT license.
