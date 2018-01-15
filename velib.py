@@ -3,21 +3,21 @@ from config import *
 
 import datetime
 import json
-import requests
 import os
+import pybikes
 import sqlite3
-import sys
 import time
 
 
-def db_init():
+def db_init(db_name=None):
     """
     Initialize a database connection, initialize the tables.
 
     Returns a new connection.
     """
     now = datetime.datetime.now()
-    db_name = "week_%s.db" % now.strftime("%V")
+    if db_name is None:
+        db_name = "week_%s.db" % now.strftime("%V")
     db_folder = os.path.join(
         'data',
         now.strftime('%Y')
@@ -29,7 +29,7 @@ def db_init():
     c = conn.cursor()
     # Init tables
     c.execute("CREATE TABLE IF NOT EXISTS stations(" +
-              "id INTEGER PRIMARY KEY, " +
+              "id INTEGER, " +
               "name TEXT, " +
               "address TEXT, " +
               "latitude REAL, " +
@@ -40,6 +40,7 @@ def db_init():
     c.execute("CREATE TABLE IF NOT EXISTS stationsstats(" +
               "station_id INTEGER, " +
               "available_bikes INTEGER, " +
+              "available_ebikes INTEGER, " +
               "free_stands INTEGER, " +
               "status TEXT, " +
               "updated INTEGER, " +
@@ -57,125 +58,100 @@ def db_init():
     return conn
 
 
-def retrieve_stations():
-    """
-    Retrieve list of stations.
-
-    Returns the new stations list.
-    """
-    # Fetch the endpoint
-    r = requests.get(api_endpoint,
-                     params={"apiKey": api_key, "contract": contract})
-    # Handle the JSON response
-    try:
-        stations_list_json = json.loads(r.text)
-    except ValueError:
-        sys.exit("Got invalid JSON payload:\n" + r.text)
-    stations_list = []
-    for station in stations_list_json:
-        stations_list.append(station)
-    return stations_list
-
-
-def update_stations():
+def update_stations(conn):
     """
     Update the stored station list.
+
+    :param conn: Database connection.
     """
-    conn = db_init()
     c = conn.cursor()
-    stations = retrieve_stations()
     database_stations = {i[0]: i
                          for i in
                          c.execute("SELECT id, name, address, latitude, longitude, banking, bonus, bike_stands FROM stations").fetchall()}
-    for station in stations:
+
+    velib = pybikes.get("velib")
+    velib.update()
+    for station in velib.stations:
         try:
             # Get old station entry if it exists
-            old_station = database_stations[station["number"]]
+            old_station = database_stations[station.extra["uid"]]
             # Diff the two stations
             event = []
-            if station["name"] != old_station[1]:
+            if station.name != old_station[1]:
                 event.append({"key": "name",
                               "old_value": old_station[1],
-                              "new_value": station["name"]})
-            if station["address"] != old_station[2]:
-                event.append({"key": "address",
-                              "old_value": old_station[2],
-                              "new_value": station["address"]})
-            if station["position"]["lat"] != old_station[3]:
+                              "new_value": station.name})
+            if station.latitude != old_station[3]:
                 event.append({"key": "latitude",
                               "old_value": old_station[3],
-                              "new_value": station["position"]["lat"]})
-            if station["position"]["lng"] != old_station[4]:
+                              "new_value": station.latitude})
+            if station.longitude != old_station[4]:
                 event.append({"key": "longitude",
                               "old_value": old_station[4],
-                              "new_value": station["position"]["lng"]})
-            if station["banking"] != old_station[5]:
+                              "new_value": station.longitude})
+            if station.extra["banking"] != old_station[5]:
                 event.append({"key": "banking",
                               "old_value": old_station[5],
-                              "new_value": station["banking"]})
-            if station["bonus"] != old_station[6]:
-                event.append({"key": "bonus",
-                              "old_value": old_station[6],
-                              "new_value": station["bonus"]})
-            if station["bike_stands"] != old_station[7]:
+                              "new_value": station.extra["banking"]})
+            if station.extra["slots"] != old_station[7]:
                 event.append({"key": "bike_stands",
                               "old_value": old_station[7],
-                              "new_value": station["bike_stands"]})
+                              "new_value": station.extra["slots"]})
             # If diff was found
             if len(event) > 0:
                 # Update
                 c.execute("UPDATE " +
                           "stations " +
-                          "SET name=?, address=?, latitude=?, longitude=?, " +
-                          "banking=?, bonus=?, bike_stands=? WHERE id=?",
-                          (station["name"],
-                           station["address"],
-                           station["position"]["lat"],
-                           station["position"]["lng"],
-                           station["banking"],
-                           station["bonus"],
-                           station["bike_stands"],
-                           station["number"]))
+                          "SET name=?, latitude=?, longitude=?, " +
+                          "banking=?, bike_stands=? WHERE id=?",
+                          (station.name,
+                           station.latitude,
+                           station.longitude,
+                           station.extra["banking"],
+                           station.extra["slots"],
+                           station.extra["uid"]))
                 # And insert event in the table
                 c.execute("INSERT INTO " +
                           "stationsevents(station_id, timestamp, event) " +
                           "VALUES(?, ?, ?)",
-                          (station["number"],
+                          (station.extra["uid"],
                            int(time.time()),
                            json.dumps(event)))
         except KeyError:
             c.execute("INSERT INTO " +
                       "stations(id, name, address, latitude, longitude, banking, bonus, bike_stands) " +
                       "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
-                      (station["number"],
-                       station["name"],
-                       station["address"],
-                       station["position"]["lat"],
-                       station["position"]["lng"],
-                       station["banking"],
-                       station["bonus"],
-                       station["bike_stands"]))
+                      (station.extra["uid"],
+                       station.name,
+                       "",  # Not available
+                       station.latitude,
+                       station.longitude,
+                       station.extra["banking"],
+                       False,  # Not available
+                       station.extra["slots"]))
         except TypeError:
             conn.rollback()
             return
 
         c.execute("INSERT INTO " +
-                  "stationsstats(station_id, available_bikes, free_stands, status, updated) " +
-                  "VALUES(?, ?, ?, ?, ?)",
-                  (station["number"],
-                   station["available_bikes"],
-                   station["available_bike_stands"],
-                   station["status"],
-                   station["last_update"]))
-    conn.commit()
+                  "stationsstats(station_id, available_bikes, available_ebikes, free_stands, status, updated) " +
+                  "VALUES(?, ?, ?, ?, ?, ?)",
+                  (station.extra["uid"],
+                   station.bikes - station.extra["ebikes"],
+                   station.extra["ebikes"],
+                   station.free,
+                   station.extra["status"],
+                   int(time.time())))  # Not available, using current timestamp
+        conn.commit()
 
 
 def main():
     """
     Handle main operations.
     """
-    # Get updated list of stations
-    update_stations()
+    # Get updated list of stations for smovengo
+    conn = db_init()
+    update_stations(conn)
 
 
 if __name__ == "__main__":
