@@ -2,7 +2,7 @@
 import datetime
 import json
 import os
-import pybikes
+import requests
 import sqlite3
 import time
 
@@ -67,34 +67,35 @@ def update_stations(conn):
                          for i in
                          c.execute("SELECT id, name, address, latitude, longitude, banking, bonus, bike_stands FROM stations").fetchall()}
 
-    velib = pybikes.get("velib")
-    velib.update()
-    for station in velib.stations:
+    req_stations = requests.get('https://velib-metropole-opendata.smoove.pro/opendata/Velib_Metropole/station_information.json')
+    stations = {
+        station['stationCode']: station
+        for station in req_stations.json()['data']['stations']
+    }
+    req_status = requests.get('https://velib-metropole-opendata.smoove.pro/opendata/Velib_Metropole/station_status.json')
+    for station in req_status.json()['data']['stations']:
+        uid = station["stationCode"]
         try:
             # Get old station entry if it exists
-            old_station = database_stations[station.extra["uid"]]
+            old_station = database_stations[uid]
             # Diff the two stations
             event = []
-            if station.name != old_station[1]:
+            if stations[uid]['name'] != old_station[1]:
                 event.append({"key": "name",
                               "old_value": old_station[1],
-                              "new_value": station.name})
-            if station.latitude != old_station[3]:
+                              "new_value": stations[uid]['name']})
+            if stations[uid]['latitude'] != old_station[3]:
                 event.append({"key": "latitude",
                               "old_value": old_station[3],
-                              "new_value": station.latitude})
-            if station.longitude != old_station[4]:
+                              "new_value": stations[uid]['lat']})
+            if stations[uid]['lon'] != old_station[4]:
                 event.append({"key": "longitude",
                               "old_value": old_station[4],
-                              "new_value": station.longitude})
-            if station.extra["banking"] != old_station[5]:
-                event.append({"key": "banking",
-                              "old_value": old_station[5],
-                              "new_value": station.extra["banking"]})
-            if station.extra["slots"] != old_station[7]:
+                              "new_value": station[uid]['lon']})
+            if station["numDocksAvailable"] != old_station[7]:
                 event.append({"key": "bike_stands",
                               "old_value": old_station[7],
-                              "new_value": station.extra["slots"]})
+                              "new_value": stations[uid]["capacity"]})
             # If diff was found
             if len(event) > 0:
                 # Update
@@ -102,43 +103,51 @@ def update_stations(conn):
                           "stations " +
                           "SET name=?, latitude=?, longitude=?, " +
                           "banking=?, bike_stands=? WHERE id=?",
-                          (station.name,
-                           station.latitude,
-                           station.longitude,
-                           station.extra["banking"],
-                           station.extra["slots"],
-                           station.extra["uid"]))
+                          (stations[uid]['name'],
+                           stations[uid]['lat'],
+                           stations[uid]['lon'],
+                           None,
+                           stations[uid]['capacity'],
+                           uid))
                 # And insert event in the table
                 c.execute("INSERT INTO " +
                           "stationsevents(station_id, timestamp, event) " +
                           "VALUES(?, ?, ?)",
-                          (station.extra["uid"],
+                          (uid,
                            int(time.time()),
                            json.dumps(event)))
         except KeyError:
             c.execute("INSERT INTO " +
                       "stations(id, name, address, latitude, longitude, banking, bonus, bike_stands) " +
                       "VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
-                      (station.extra["uid"],
-                       station.name,
+                      (uid,
+                       stations[uid]['name'],
                        "",  # Not available
-                       station.latitude,
-                       station.longitude,
-                       station.extra["banking"],
+                       stations[uid]['lat'],
+                       stations[uid]['lon'],
+                       None,  # Not available
                        False,  # Not available
-                       station.extra["slots"]))
+                       stations[uid]["capacity"]))
         except TypeError:
             conn.rollback()
             return
 
+        numEBikesAvailable = (
+            station['numBikesAvailable']
+            - next(
+                x['ebike']
+                for x in station['num_bikes_available_types']
+                if 'ebike' in x
+            )
+        )
         c.execute("INSERT INTO " +
                   "stationsstats(station_id, available_bikes, available_ebikes, free_stands, status, updated) " +
                   "VALUES(?, ?, ?, ?, ?, ?)",
-                  (station.extra["uid"],
-                   station.bikes - station.extra["ebikes"],
-                   station.extra["ebikes"],
-                   station.free,
-                   station.extra["status"],
+                  (uid,
+                   station['numBikesAvailable'],
+                   numEBikesAvailable,
+                   station['numDocksAvailable'],
+                   None,
                    int(time.time())))  # Not available, using current timestamp
         conn.commit()
 
